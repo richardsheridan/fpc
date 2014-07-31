@@ -36,7 +36,7 @@ def load_csv(fullpath):
     
     Don't use this yet!
     '''
-    raise NotImplementedError
+#    raise NotImplementedError
     # fullpath=r'C:\Users\rjs3\SkyDriveNISTjnc\data\xrr\2014-01-14\fw 100m 160c washed retry crit.csv'
     dialect_dict={'lineterminator': '\r\n', 'skipinitialspace': True, 
              'quoting': 0, 'delimiter': ',', 'quotechar': '"',
@@ -44,7 +44,7 @@ def load_csv(fullpath):
     
     
     csv.register_dialect('philips-csv',dialect_dict)
-    
+    ''' check dialect
     with open(fullpath, 'rb') as csvfile:
         sniffdialect = csv.Sniffer().sniff(csvfile.read(),delimiters=',')  
         dialect_dict=vars(sniffdialect)
@@ -59,11 +59,37 @@ def load_csv(fullpath):
                 del dialect_dict[view]
              
         csv.register_dialect('philips-csv2',dialect_dict)
-        csvfile.seek(0)
-        reader = csv.reader(csvfile, 'philips-csv')
         for row in reader:
             print(row)
+    '''
+    headers={}
+    with open(fullpath,'r') as csvfile:
+#        csvfile.seek(0)
+        reader = csv.reader(csvfile, 'philips-csv')
+        for row in reader:
+            csvheader=row[0]
+            if csvheader=='Sample identification':
+                headers['title']=row[1]
+            elif csvheader=='K-Alpha1 wavelength':
+                headers['wavelength']=row[1]
+            elif csvheader=='File date and time':
+                headers['date']=row[1]
+            elif csvheader=='Time per step':
+                time=float(row[1])
+            elif csvheader=='Angle':
+                break
+        #Generate a list of [angle, count] "datapoint" lists
+        data=[[float(row[0]),float(row[1])] for row in reader]
+        
+    # split them into individual lists, then convert to arrays
+    angle, counts = tuple(zip(*data))
+    angle, counts = np.array(angle), np.array(counts)
     
+    cps=counts/time
+    dcps=np.sqrt(counts)/time
+    keepers = counts>0
+    
+    return headers, angle[keepers], cps[keepers], dcps[keepers]
         
 def load_xrdml(fullpath):
     '''
@@ -90,20 +116,13 @@ def load_xrdml(fullpath):
     dcps=np.sqrt(counts)/time
     angle=np.linspace(startangle,stopangle,len(cps))
     keepers = counts>0
-    return headers, angle[keepers], cps[keepers], dcps[keepers]
     
-def load_philips(fullpath):
-    '''
-    Parse Philips XRDML and return the arrays "angle", "cps", and "dcps".
-    '''
-    if fullpath.endswith('.xrdml'):
-        return load_xrdml(fullpath)
-    elif fullpath.endswith('.csv'):
-        return load_csv(fullpath)
-    else:
-        raise ValueError('Unsupported file type' + str(fullpath))
+    return headers, angle[keepers], cps[keepers], dcps[keepers]
         
 def stitch_data(fullpaths):
+    '''
+    Load data into list, zip it up, test it, and stitch/sort if necessary
+    '''
     data=[load_xrdml(fullpath)
         for fullpath in fullpaths if fullpath.endswith('.xrdml')]
             
@@ -145,6 +164,7 @@ def stitch_data(fullpaths):
     angle = angle[sortind]
     cps = cps[sortind]
     dcps = dcps[sortind]
+    
     return headers, angle, cps, dcps
     
 def mymessage(text):
@@ -187,9 +207,10 @@ def write_refl(headers, q, refl, drefl, path):
     for point in tuple(zip(q,refl,drefl)):
         textlist.append('{:.12g} {:.12g} {:.12g}'.format(*point))
 #    print('\n'.join(textlist))
-    with open(fullpath, 'w+') as reflfile:
+    with open(fullpath, 'w') as reflfile:
         reflfile.writelines('\n'.join(textlist))
-        print('Saved successfully as:', fullpath)
+        
+    print('Saved successfully as:', fullpath)
     
 def footprintCorrect(fullpaths=None,save=True):
     '''
@@ -236,3 +257,4 @@ def footprintCorrect(fullpaths=None,save=True):
            
 if __name__ == '__main__':
     footprintCorrect() # We don't need no stinking commandline arguments
+    
