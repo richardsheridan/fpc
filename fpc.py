@@ -20,8 +20,8 @@ def get_files():
     Tk().withdraw() 
     
     # show an "Open" dialog box and return the paths to the selected files
-    fullpaths = askopenfilename(multiple=1,defaultextension='.xrdml', 
-                    filetypes=[('XRDML','.xrdml'),('CSV','.csv')])
+    fullpaths = askopenfilename(multiple=1,#defaultextension='.xrdml', 
+                    filetypes=[('CSV','.csv'),('XRDML','.xrdml')])
     fullpaths = re.findall('\{(.*?)\}', fullpaths)
     if len(fullpaths):
         print('User opened:', *fullpaths, sep='\n')
@@ -34,7 +34,6 @@ def load_csv(fullpath):
     '''
     Parse Philips CSV files and return the arrays "angle", "cps", and "dcps".
     
-    Don't use this yet!
     '''
 #    raise NotImplementedError
     # fullpath=r'C:\Users\rjs3\SkyDriveNISTjnc\data\xrr\2014-01-14\fw 100m 160c washed retry crit.csv'
@@ -44,7 +43,7 @@ def load_csv(fullpath):
     
     
     csv.register_dialect('philips-csv',dialect_dict)
-    ''' check dialect
+    ''' #check dialect
     with open(fullpath, 'rb') as csvfile:
         sniffdialect = csv.Sniffer().sniff(csvfile.read(),delimiters=',')  
         dialect_dict=vars(sniffdialect)
@@ -136,7 +135,7 @@ def stitch_data(fullpaths):
     if len(data)==1:
         return data[0]
         
-    #Zipped is way more convenient here
+    # Zipped is way more convenient here
     data=zip(*data)
 
     # Test if our data come from the same sample.
