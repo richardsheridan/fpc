@@ -27,7 +27,7 @@ def get_files():
         print('User opened:', *fullpaths, sep='\n')
     else:
         print('No files selected')
-        raise RuntimeError('Exiting, not an error')
+        raise ExitException('Exiting, not an error')
     return fullpaths
     
 def load_csv(fullpath):
@@ -131,7 +131,7 @@ def stitch_data(fullpaths):
     # Cut out early if we only load one file
     if len(data)==0:
         print('no supported types selected')
-        raise RuntimeError('Exiting, not an error')
+        raise ExitException('Exiting, not an error')
     if len(data)==1:
         return data[0]
         
@@ -196,7 +196,7 @@ def write_refl(headers, q, refl, drefl, path):
 
 #    fullpath = re.findall('\{(.*?)\}', s)
     if len(fullpath)==0:
-        raise RuntimeError('Exiting, not an error')
+        raise ExitException('Exiting, not an error')
         
     textlist = ['#pythonfootprintcorrect 1 1 2014-07-30']
     for header in headers:
@@ -253,7 +253,15 @@ def footprintCorrect(fullpaths=None,save=True):
     if save:
         write_refl(headers,q_correct,refl_correct,drefl_correct,path)    
     return q_correct,refl_correct,drefl_correct
-           
-if __name__ == '__main__':
-    footprintCorrect() # We don't need no stinking commandline arguments
+
+class ExitException(Exception):
+     def __init__(self, value):
+         self.value = value
+     def __str__(self):
+         return repr(self.value)
     
+if __name__ == '__main__':
+    try:
+        footprintCorrect() # We don't need no stinking commandline arguments
+    except ExitException:
+        pass
