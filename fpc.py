@@ -10,6 +10,7 @@ import numpy as np
 from xml.etree import ElementTree as et
 from Tkinter import Tk
 from tkFileDialog import askopenfilename,asksaveasfilename
+from tkSimpleDialog import askfloat
 import matplotlib.pyplot as plt
 
 def get_files():
@@ -21,7 +22,7 @@ def get_files():
     
     # show an "Open" dialog box and return the paths to the selected files
     fullpaths = askopenfilename(multiple=1,#defaultextension='.xrdml', 
-                    filetypes=[('CSV','.csv'),('XRDML','.xrdml')])
+                    filetypes=[('CSV','.csv'),('XRDML','.xrdml'),('All files','.*')])
     fullpaths = re.findall('\{(.*?)\}', fullpaths)
     if len(fullpaths):
         print('User opened:', *fullpaths, sep='\n')
@@ -37,12 +38,12 @@ def load_csv(fullpath):
     '''
 #    raise NotImplementedError
     # fullpath=r'C:\Users\rjs3\SkyDriveNISTjnc\data\xrr\2014-01-14\fw 100m 160c washed retry crit.csv'
-    dialect_dict={'lineterminator': '\r\n', 'skipinitialspace': True, 
-             'quoting': 0, 'delimiter': ',', 'quotechar': '"',
-             'doublequote': False}
+#    dialect_dict={'lineterminator': '\r\n', 'skipinitialspace': True, 
+#             'quoting': 0, 'delimiter': ',', 'quotechar': '"',
+#             'doublequote': False}
     
     
-    csv.register_dialect('philips-csv',dialect_dict)
+#    csv.register_dialect('philips-csv',dialect_dict)
     ''' #check dialect
     with open(fullpath, 'rb') as csvfile:
         sniffdialect = csv.Sniffer().sniff(csvfile.read(),delimiters=',')  
@@ -64,7 +65,7 @@ def load_csv(fullpath):
     headers={}
     with open(fullpath,'r') as csvfile:
 #        csvfile.seek(0)
-        reader = csv.reader(csvfile, 'philips-csv')
+        reader = csv.reader(csvfile)#,'philips-csv')
         for row in reader:
             csvheader=row[0]
             if csvheader=='Sample identification':
@@ -196,6 +197,7 @@ def write_refl(headers, q, refl, drefl, path):
 
 #    fullpath = re.findall('\{(.*?)\}', s)
     if len(fullpath)==0:
+        print('Results not saved')
         raise ExitException('Exiting, not an error')
         
     textlist = ['#pythonfootprintcorrect 1 1 2014-07-30']
@@ -210,6 +212,9 @@ def write_refl(headers, q, refl, drefl, path):
         reflfile.writelines('\n'.join(textlist))
         
     print('Saved successfully as:', fullpath)
+
+def q_from_angle(angle,wavelength=1.5405980):
+    return 4*np.pi/wavelength*np.sin(np.pi/180*angle)
     
 def footprintCorrect(fullpaths=None,save=True):
     '''
@@ -221,30 +226,41 @@ def footprintCorrect(fullpaths=None,save=True):
     path=os.path.split(fullpaths[0])[0]
     headers,angle,cps,dcps=stitch_data(fullpaths)
     
-    q=4*np.pi/float(headers['wavelength'])*np.sin(np.pi/180*angle)
-    fig=plot_refl_footprint(q,cps)
+    wavelength=float(headers['wavelength'])
+    q=q_from_angle(angle,wavelength)
+    plot_refl_footprint(q,cps)
     
     mymessage('Click the beginning and end of the footprint region')
     points=plt.ginput(2,timeout=-1)
 #    plt.close(fig)
+#    cutoff=askfloat('Cutoff angle','A footprint cutoff angle in degrees',
+#             initialvalue=1.0)
+    width=askfloat('Sample width','Average sample width in mm',initialvalue=24.5)
+    cutoff=np.arcsin(.4/width)/np.pi*180
+    q_cut=q_from_angle(cutoff,wavelength)
     
-    start,stop=zip(*points)[0]
-    keepers=q > start
-    logical_range = np.logical_and(keepers, q < stop)
-    fp_q = q[logical_range]
-    fp_cps = cps[logical_range]
+    start,stop = zip(*points)[0]
+    keepers = q > start
+    fit_range = np.logical_and(keepers, q < stop)
+    fp_q = q[fit_range]
+    fp_cps = cps[fit_range]
     p = np.polyfit(fp_q,fp_cps,1)
     
-    q_correct=q[keepers]
-    footprint = p[0]*q_correct+p[1]
+    q_correct = q[keepers]
+    footprint = np.polyval(p, q_correct)
+    fp_region = q_correct<q_cut
+    footprint[np.logical_not(fp_region)]=footprint[fp_region][-1]
+    
     plt.plot(q_correct,footprint,'r--')
     plt.draw()
+    
     refl_correct = cps[keepers]/footprint
     refl_correct = refl_correct/max(refl_correct)
     drefl_correct = dcps[keepers]/footprint/max(refl_correct)
     
     plt.figure()
     plt.semilogy(q,cps/max(cps),'k--')
+    plt.semilogy(q_correct,footprint/max(cps),'r:')
     plt.semilogy(q_correct,refl_correct,'k-')
     mymessage('Resulting reflectivity')
     plt.draw()
@@ -259,7 +275,7 @@ class ExitException(Exception):
          self.value = value
      def __str__(self):
          return repr(self.value)
-    
+
 if __name__ == '__main__':
     try:
         footprintCorrect() # We don't need no stinking commandline arguments
