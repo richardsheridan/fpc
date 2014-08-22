@@ -109,9 +109,10 @@ def load_xrdml(fullpath):
     startangle=float(xrdroot[1][5][1][1][0].text)
     stopangle=float(xrdroot[1][5][1][1][1].text)
     time=float(xrdroot[1][5][1][3].text)
-    counts=xrdroot[1][5][1][4].text.split(' ')
+    counts=xrdroot[1][5][1][4].text#.split(' ')
     
-    counts=np.array([int(count) for count in counts])
+#    counts=np.array([int(count) for count in counts])
+    counts=np.fromstring(counts,sep=' ',dtype=int)
     cps=counts/time
     dcps=np.sqrt(counts)/time
     angle=np.linspace(startangle,stopangle,len(cps))
@@ -235,7 +236,10 @@ def footprintCorrect(fullpaths=None,save=True):
 #    plt.close(fig)
 #    cutoff=askfloat('Cutoff angle','A footprint cutoff angle in degrees',
 #             initialvalue=1.0)
+    Tk().withdraw()
     width=askfloat('Sample width','Average sample width in mm',initialvalue=24.5)
+    if width is None:
+        raise ExitException('Exiting, not an error')
     cutoff=np.arcsin(.4/width)/np.pi*180
     q_cut=q_from_angle(cutoff,wavelength)
     
