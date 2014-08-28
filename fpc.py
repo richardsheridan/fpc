@@ -35,37 +35,10 @@ def load_csv(fullpath):
     '''
     Parse Philips CSV files and return the arrays "angle", "cps", and "dcps".
     
-    '''
-#    raise NotImplementedError
-    # fullpath=r'C:\Users\rjs3\SkyDriveNISTjnc\data\xrr\2014-01-14\fw 100m 160c washed retry crit.csv'
-#    dialect_dict={'lineterminator': '\r\n', 'skipinitialspace': True, 
-#             'quoting': 0, 'delimiter': ',', 'quotechar': '"',
-#             'doublequote': False}
-    
-    
-#    csv.register_dialect('philips-csv',dialect_dict)
-    ''' #check dialect
-    with open(fullpath, 'rb') as csvfile:
-        sniffdialect = csv.Sniffer().sniff(csvfile.read(),delimiters=',')  
-        dialect_dict=vars(sniffdialect)
-        didictviews=dialect_dict.viewkeys()
-        badviews=[]
-        for view in didictviews:
-            if '_' in view:
-                print('deleting '+view)
-                badviews.append(view)
-            
-        for view in badviews:
-                del dialect_dict[view]
-             
-        csv.register_dialect('philips-csv2',dialect_dict)
-        for row in reader:
-            print(row)
-    '''
+    '''    
     headers={}
     with open(fullpath,'r') as csvfile:
-#        csvfile.seek(0)
-        reader = csv.reader(csvfile)#,'philips-csv')
+        reader = csv.reader(csvfile)
         for row in reader:
             csvheader=row[0]
             if csvheader=='Sample identification':
@@ -97,21 +70,27 @@ def load_xrdml(fullpath):
     '''
     headers={}
     xrdtree=et.parse(fullpath)
-    xrdroot=xrdtree.getroot()
+    ns='/{http://www.xrdml.com/XRDMeasurement/1.0}'
     
-    # I suppose hardcoded index access is "bad", but there would be tons of
-    # pointless iteration on hardcoded data otherwise
-    headers['title']=xrdroot[0][0].text
-    headers['wavelength']=xrdroot[1][1][0].text
+    headers['title']=xrdtree.findtext(ns.join(('.','sample','id')))
+    headers['wavelength']=xrdtree.findtext(ns.join(('.','xrdMeasurement',
+        'usedWavelength','kAlpha1')))
     headers['instrument']='X-ray'
-    headers['date']=xrdroot[1][5][0][0].text
+    headers['date']=xrdtree.findtext(ns.join(('.','xrdMeasurement','scan',
+        'header','startTimeStamp')))
     
-    startangle=float(xrdroot[1][5][1][1][0].text)
-    stopangle=float(xrdroot[1][5][1][1][1].text)
-    time=float(xrdroot[1][5][1][3].text)
-    counts=xrdroot[1][5][1][4].text#.split(' ')
+    dataPoints=xrdtree.find(ns.join(('.','xrdMeasurement','scan','dataPoints')))
     
-#    counts=np.array([int(count) for count in counts])
+    for child in dataPoints:
+        tag=child.tag
+        if tag == ns[1:]+'positions' and child.get('axis')=='Omega':
+            startangle=float(child.findtext('.'+ns+'startPosition'))
+            stopangle=float(child.findtext('.'+ns+'endPosition'))
+        elif tag == ns[1:]+'commonCountingTime':
+            time=float(child.text)
+        elif tag == ns[1:]+'intensities':
+            counts=child.text
+                
     counts=np.fromstring(counts,sep=' ',dtype=int)
     cps=counts/time
     dcps=np.sqrt(counts)/time
@@ -162,11 +141,7 @@ def stitch_data(fullpaths):
         
     # then sort based on angle
     sortind = np.argsort(angle)
-    angle = angle[sortind]
-    cps = cps[sortind]
-    dcps = dcps[sortind]
-    
-    return headers, angle, cps, dcps
+    return headers, angle[sortind], cps[sortind], dcps[sortind]
     
 def mymessage(text):
     print(text)
@@ -232,8 +207,10 @@ def footprintCorrect(fullpaths=None,save=True):
     plot_refl_footprint(q,cps)
     
     mymessage('Click the beginning and end of the footprint region')
-    points=plt.ginput(2,timeout=-1)
-#    plt.close(fig)
+    points=plt.ginput(2,timeout=100)
+    if len(points)<2:
+        raise ExitException('Point selection timeout, not an error')
+    
 #    cutoff=askfloat('Cutoff angle','A footprint cutoff angle in degrees',
 #             initialvalue=1.0)
     Tk().withdraw()
@@ -246,14 +223,12 @@ def footprintCorrect(fullpaths=None,save=True):
     start,stop = zip(*points)[0]
     keepers = q > start
     fit_range = np.logical_and(keepers, q < stop)
-    fp_q = q[fit_range]
-    fp_cps = cps[fit_range]
-    p = np.polyfit(fp_q,fp_cps,1)
+    p = np.polyfit(q[fit_range],cps[fit_range],1)
     
     q_correct = q[keepers]
     footprint = np.polyval(p, q_correct)
     fp_region = q_correct<q_cut
-    footprint[np.logical_not(fp_region)]=footprint[fp_region][-1]
+    footprint[np.logical_not(fp_region)]=np.polyval(p,q_cut)
     
     plt.plot(q_correct,footprint,'r--')
     plt.draw()
