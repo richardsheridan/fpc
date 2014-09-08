@@ -22,7 +22,7 @@ def get_files():
     
     # show an "Open" dialog box and return the paths to the selected files
     fullpaths = askopenfilename(multiple=1,#defaultextension='.xrdml', 
-                    filetypes=[('CSV','.csv'),('XRDML','.xrdml'),('All files','.*')])
+                    filetypes=[('XRDML','.xrdml'),('CSV','.csv'),('All files','.*')])
     fullpaths = re.findall('\{(.*?)\}', fullpaths)
     if len(fullpaths):
         print('User opened:', *fullpaths, sep='\n')
@@ -31,6 +31,19 @@ def get_files():
         raise ExitException('Exiting, not an error')
     return fullpaths
     
+def crop_noise(counts):
+    keepers = np.zeros_like(counts,dtype=bool)
+    for i,count in enumerate(counts):
+        if count:
+            keepers[i] = True
+        else:
+            break
+        
+    if not any(keepers):
+        raise RuntimeError('No nonzero data in this file')
+
+    return keepers
+
 def load_csv(fullpath):
     '''
     Parse Philips CSV files and return the arrays "angle", "cps", and "dcps".
@@ -60,7 +73,7 @@ def load_csv(fullpath):
     
     cps=counts/time
     dcps=np.sqrt(counts)/time
-    keepers = counts>0
+    keepers = crop_noise(counts)
     
     return headers, angle[keepers], cps[keepers], dcps[keepers]
         
@@ -95,7 +108,7 @@ def load_xrdml(fullpath):
     cps=counts/time
     dcps=np.sqrt(counts)/time
     angle=np.linspace(startangle,stopangle,len(cps))
-    keepers = counts>0
+    keepers = crop_noise(counts)
     
     return headers, angle[keepers], cps[keepers], dcps[keepers]
         
