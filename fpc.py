@@ -7,11 +7,11 @@ Created on Mon Dec 02 13:23:48 2013
 from __future__ import division, print_function
 import csv, re, os
 import numpy as np
+import matplotlib.pyplot as plt
 from xml.etree import ElementTree as et
 from Tkinter import Tk
 from tkFileDialog import askopenfilename,asksaveasfilename
 from tkSimpleDialog import askfloat
-import matplotlib.pyplot as plt
 
 def get_files():
     '''
@@ -55,7 +55,7 @@ def load_csv(fullpath):
         for row in reader:
             csvheader=row[0]
             if csvheader=='Sample identification':
-                headers['title']=row[1]
+                headers['title']=row[1].strip()
             elif csvheader=='K-Alpha1 wavelength':
                 headers['wavelength']=row[1]
             elif csvheader=='File date and time':
@@ -85,7 +85,7 @@ def load_xrdml(fullpath):
     xrdtree=et.parse(fullpath)
     ns='/{http://www.xrdml.com/XRDMeasurement/1.0}'
     
-    headers['title']=xrdtree.findtext(ns.join(('.','sample','id')))
+    headers['title']=xrdtree.findtext(ns.join(('.','sample','id'))).strip()
     headers['wavelength']=xrdtree.findtext(ns.join(('.','xrdMeasurement',
         'usedWavelength','kAlpha1')))
     headers['instrument']='X-ray'
@@ -189,7 +189,7 @@ def write_refl(headers, q, refl, drefl, path):
         print('Results not saved')
         raise ExitException('Exiting, not an error')
         
-    textlist = ['#pythonfootprintcorrect 1 1 2014-07-30']
+    textlist = ['#pythonfootprintcorrect 1 1 2014-09-11']
     for header in headers:
         textlist.append('#'+header+' '+headers[header]) 
     textlist.append('#columns Qz R dR')
