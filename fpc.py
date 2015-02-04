@@ -5,13 +5,19 @@ Created on Mon Dec 02 13:23:48 2013
 @author: rjs3
 """
 from __future__ import division, print_function
-import csv, re, os
+import csv, re, os, sys
+ver = sys.version_info.major
 import numpy as np
 import matplotlib.pyplot as plt
 from xml.etree import ElementTree as et
-from Tkinter import Tk
-from tkFileDialog import askopenfilename,asksaveasfilename
-from tkSimpleDialog import askfloat
+if ver >= 3:
+    from tkinter import Tk
+    from tkinter.filedialog import askopenfilename,asksaveasfilename
+    from tkinter.simpledialog import askfloat
+else:
+    from Tkinter import Tk
+    from tkFileDialog import askopenfilename,asksaveasfilename
+    from tkSimpleDialog import askfloat
 
 def get_files():
     '''
@@ -23,7 +29,9 @@ def get_files():
     # show an "Open" dialog box and return the paths to the selected files
     fullpaths = askopenfilename(multiple=1,#defaultextension='.xrdml', 
                     filetypes=[('XRDML','.xrdml'),('CSV','.csv'),('All files','.*')])
-    fullpaths = re.findall('\{(.*?)\}', fullpaths)
+    if ver < 3:
+        fullpaths = re.findall('\{(.*?)\}', fullpaths)
+        
     if len(fullpaths):
         print('User opened:', *fullpaths, sep='\n')
     else:
@@ -130,7 +138,7 @@ def stitch_data(fullpaths):
         return data[0]
         
     # Zipped is way more convenient here
-    data=zip(*data)
+    data=list(zip(*data))
 
     # Test if our data come from the same sample.
     sentinel=None
@@ -217,10 +225,10 @@ def footprintCorrect(fullpaths=None,save=True):
     
     wavelength=float(headers['wavelength'])
     q=q_from_angle(angle,wavelength)
-    plot_refl_footprint(q,cps)
+    fig=plot_refl_footprint(q,cps)
     
     mymessage('Click the beginning and end of the footprint region')
-    points=plt.ginput(2,timeout=100)
+    points=fig.ginput(2,timeout=100)
     if len(points)<2:
         raise ExitException('Point selection timeout, not an error')
     
@@ -233,7 +241,7 @@ def footprintCorrect(fullpaths=None,save=True):
     cutoff=np.arcsin(.4/width)/np.pi*180
     q_cut=q_from_angle(cutoff,wavelength)
     
-    start,stop = zip(*points)[0]
+    start,stop = points[0][0], points[1][0]
     keepers = q > start
     fit_range = np.logical_and(keepers, q < stop)
     p = np.polyfit(q[fit_range],cps[fit_range],1)
