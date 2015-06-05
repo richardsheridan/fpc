@@ -183,7 +183,7 @@ def write_refl(headers, q, refl, drefl, path):
 #    fullpath = re.findall('\{(.*?)\}', s)
     if len(fullpath)==0:
         print('Results not saved')
-        raise ExitException('Exiting, not an error')
+        return
 
     textlist = ['#pythonfootprintcorrect 1 1 2014-09-11']
     for header in headers:
