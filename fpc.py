@@ -154,8 +154,8 @@ def stitch_data(fullpaths):
     cps = np.concatenate(data[2])
     dcps = np.concatenate(data[3])
 
-    # test if our data are already sorted
-    if not np.all(np.diff(angle) >= 0.0):
+    # test if our data are already sorted ("if all monotonically increasing")
+    if np.all(np.diff(angle) >= 0.0):
         return headers, angle, cps, dcps
 
     # then sort based on angle
